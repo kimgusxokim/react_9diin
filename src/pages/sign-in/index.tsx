@@ -16,7 +16,6 @@ const loginSchema = z.object({
 
 export default function SignIn() {
   // 비밀번호 보이기/숨기기 토글 상태
-  const [showPassword, setShowPassword] = React.useState(false)
 
   // 3. 리액트 훅 폼 선언 (SignIn 내부로 이동)
   const form = useForm<z.infer<typeof loginSchema>>({

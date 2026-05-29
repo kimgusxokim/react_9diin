@@ -1,13 +1,14 @@
 "use client"
-
 import * as React from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import * as z from "zod"
 
-import { Button, Card, CardContent, CardFooter, Checkbox, Field, FieldError, FieldGroup, FieldLabel, Input, Label } from "@/components/ui"
-import { NavLink } from "react-router"
+import { Button, Card, CardContent, CardFooter, Checkbox, Field, FieldError, FieldGroup, FieldLabel, Input, Label, Separator } from "@/components/ui"
+import { Navigate, NavLink, useNavigate } from "react-router"
 import { ArrowLeft, Asterisk, ChevronRight } from "lucide-react"
+import { toast } from "sonner"
+import supabase from "../../lib/supabase/client"
 
 // 1. 검증 스키마 정의
 const loginSchema = z
@@ -21,14 +22,14 @@ const loginSchema = z
       ctx.addIssue({
         code: "custom",
         message: "비밀번호가 일치하지 않습니다.",
-        path: "confirmPassword",
+        path: ["confirmPassword"],
       })
     }
   })
 
 export default function SignUP() {
+  const navigate = useNavigate()
   // 비밀번호 보이기/숨기기 토글 상태
-  const [showPassword, setShowPassword] = React.useState(false)
 
   // 3. 리액트 훅 폼 선언 (SignIn 내부로 이동)
   const form = useForm<z.infer<typeof loginSchema>>({
@@ -39,9 +40,44 @@ export default function SignUP() {
       confirmPassword: "",
     },
   })
+  const [serviceAgreed, setServiceAgreed] = React.useState<boolean>(false)
+  const [privacyAgreed, setPrivacyAgreed] = React.useState<boolean>(false)
+  const [marketingAgreed, setMarketingAgreed] = React.useState<boolean>(false)
 
-  function onSubmit(data: z.infer<typeof loginSchema>) {
-    console.log("제출된 데이터:", data)
+  const handleCheckService = () => setServiceAgreed(!serviceAgreed)
+  const handleCheckPrivacy = () => setPrivacyAgreed(!privacyAgreed)
+  const handleCheckMarketing = () => setMarketingAgreed(!marketingAgreed)
+
+  const onSubmit = async (values: z.infer<typeof loginSchema>) => {
+    if (!serviceAgreed || !privacyAgreed) {
+      // 경고 메세지 - Toast UI
+      toast.warning("필수 동의항목을 체크해주세요.")
+      return
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+      })
+
+      // 에러 방지 및 결과 확인을 위해 로그를 출력합니다.
+      if (error) {
+        // 에러 메세지 - Toast UI
+        toast.error(error.message)
+        return
+      }
+      // 회원가입 성공
+      if (data) {
+        // 성공 메세지 - Toast UI
+        toast.success("회원가입을 완료했습니다.")
+        // 로그인 페이지로 리다이렉트
+        navigate("/sign-in")
+      }
+    } catch (error) {
+      console.log(error)
+      throw new Error(`${error}`)
+    }
   }
 
   return (
@@ -74,7 +110,7 @@ export default function SignUP() {
                     render={({ field, fieldState }) => (
                       <Field data-invalid={fieldState.invalid}>
                         <FieldLabel htmlFor="login-password">비밀번호</FieldLabel>
-                        <Input {...field} id="login-password" aria-invalid={fieldState.invalid} placeholder="비밀번호를 입력하세요." autoComplete="off" />
+                        <Input {...field} id="login-password" aria-invalid={fieldState.invalid} placeholder="비밀번호를 입력하세요." type="password" autoComplete="off" />
                         {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                       </Field>
                     )}
@@ -85,12 +121,12 @@ export default function SignUP() {
                     render={({ field, fieldState }) => (
                       <Field data-invalid={fieldState.invalid}>
                         <FieldLabel htmlFor="login-confirm-password">비밀번호 확인</FieldLabel>
-                        <Input {...field} id="login-confirm-password" aria-invalid={fieldState.invalid} placeholder="비밀번호를 다시 입력해주세요." autoComplete="off" />
+                        <Input {...field} id="login-confirm-password" aria-invalid={fieldState.invalid} placeholder="비밀번호를 다시 입력해주세요." type="password" autoComplete="off" />
                         {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                       </Field>
                     )}
                   />
-                  <div className="grid gap-2">
+                  <div className="grid gap-4">
                     <div className="grid gap-4">
                       <div className="flex items-center gap-1">
                         <Asterisk size={14} className="text-[#F96859]" />
@@ -99,7 +135,7 @@ export default function SignUP() {
                       <div className="flex flex-col">
                         <div className="flex">
                           <div className="flex w-full items-center justify-start gap-2 text-xs">
-                            <Checkbox />
+                            <Checkbox checked={serviceAgreed} onCheckedChange={handleCheckService} />
                             서비스 이용약관 동의
                           </div>
                           <Button variant={"link"} className="gap-1 !p-0">
@@ -109,8 +145,26 @@ export default function SignUP() {
                         </div>
                         <div className="flex">
                           <div className="flex w-full items-center justify-start gap-2 text-xs">
-                            <Checkbox />
+                            <Checkbox checked={privacyAgreed} onCheckedChange={handleCheckPrivacy} />
                             개인정보 수집 및 이용동의
+                          </div>
+                          <Button variant={"link"} className="gap-1 !p-0">
+                            <p className="text-xs">자세히 보기</p>
+                            <ChevronRight />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <Separator />
+                    <div className="grid gap-4">
+                      <div className="flex items-center gap-1">
+                        <Label>선택 동의항목</Label>
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex">
+                          <div className="flex w-full items-center justify-start gap-2 text-xs">
+                            <Checkbox checked={marketingAgreed} onCheckedChange={handleCheckMarketing} />
+                            마케팅 및 광고 수신 동의
                           </div>
                           <Button variant={"link"} className="gap-1 !p-0">
                             <p className="text-xs">자세히 보기</p>
